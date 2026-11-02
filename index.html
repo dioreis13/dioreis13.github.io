@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KINETIC // Habit Telemetry & Streak Engine</title>
+  <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            obsidian: {
+              950: '#090A0F',
+              900: '#12151E',
+              800: '#1A1E2B',
+              700: '#262B3D',
+            },
+            alabaster: {
+              50: '#F8FAFC',
+              100: '#F1F5F9',
+              200: '#E2E8F0',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Micro-interactions & Scrollbars */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    @keyframes checkPop {
+      0% { transform: scale(0.82); }
+      50% { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+    .animate-check-pop {
+      animation: checkPop 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.9; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.08); }
+    }
+    .streak-flame-active {
+      animation: pulseGlow 2.2s infinite ease-in-out;
+    }
+    /* Custom subtle scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-alabaster-50 dark:bg-obsidian-950 text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 selection:bg-emerald-500/20 selection:text-emerald-400">
+
+  <!-- Top Utility Header -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-alabaster-50/85 dark:bg-obsidian-950/85 border-b border-slate-200/80 dark:border-white/[0.07]">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand Identity -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-inner">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">KINETIC</h1>
+            <span class="text-[10px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400 border border-slate-300/50 dark:border-white/10">v2.4 TELEMETRY</span>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Daily Execution Matrix & Streak Analytics</p>
+        </div>
+      </div>
+
+      <!-- Week Navigator -->
+      <div class="flex items-center bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/[0.08] rounded-lg p-1 shadow-sm">
+        <button id="prevWeekBtn" title="Previous 7-Day Window" class="p-1.5 rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.05] transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div class="px-3 text-center min-w-[155px] sm:min-w-[185px]">
+          <span id="weekRangeLabel" class="font-mono text-xs font-medium tracking-tight text-slate-800 dark:text-slate-200 tabular-nums">LOADING...</span>
+        </div>
+        <button id="nextWeekBtn" title="Next 7-Day Window" class="p-1.5 rounded-md text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.05] transition disabled:opacity-30 disabled:pointer-events-none">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <button id="resetTodayBtn" class="ml-1 px-2 py-1 text-[11px] font-mono font-medium rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition hidden">
+          TODAY
+        </button>
+      </div>
+
+      <!-- Right Actions: Data Portability + Theme Switch + New Habit CTA -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- Data Portability Toolbar Group -->
+        <div class="flex items-center bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/[0.08] rounded-lg p-1 shadow-sm">
+          <button id="exportJsonBtn" title="Export full JSON backup snapshot" class="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-medium text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] transition">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span class="hidden xl:inline">JSON</span>
+          </button>
+          <div class="w-px h-3.5 bg-slate-200 dark:bg-white/[0.08] mx-0.5"></div>
+          <button id="exportCsvBtn" title="Export analytics-ready CSV logs" class="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] transition">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span class="hidden xl:inline">CSV</span>
+          </button>
+          <div class="w-px h-3.5 bg-slate-200 dark:bg-white/[0.08] mx-0.5"></div>
+          <button id="openImportModalBtn" title="Import JSON or CSV telemetry backup" class="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono font-medium text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-white/[0.05] transition">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span class="hidden sm:inline">Import</span>
+          </button>
+        </div>
+
+        <button id="themeToggleBtn" aria-label="Toggle color theme" class="p-2 rounded-lg bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-white/20 transition">
+          <!-- Sun Icon -->
+          <svg id="sunIcon" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <!-- Moon Icon -->
+          <svg id="moonIcon" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+        </button>
+
+        <button id="openAddModalBtn" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium text-xs sm:text-sm bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold shadow-sm shadow-emerald-500/20 transition active:scale-[0.98]">
+          <svg class="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>New Habit</span>
+          <kbd class="hidden md:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-slate-950/15 text-slate-950 rounded">N</kbd>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Top KPI Summary Strip (3 Cards) -->
+    <section aria-label="Telemetry Summary Metrics" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      
+      <!-- Card 1: Today's Progress -->
+      <div class="bg-white dark:bg-obsidian-900 border border-slate-200/90 dark:border-white/[0.07] rounded-xl p-5 shadow-sm relative overflow-hidden">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">Today's Execution</span>
+            <div class="mt-2 flex items-baseline gap-2.5">
+              <span id="kpiTodayCount" class="font-display font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 dark:text-white tabular-nums">0/0</span>
+              <span id="kpiTodayPct" class="font-mono text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 tabular-nums">0%</span>
+            </div>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4 w-full bg-slate-100 dark:bg-obsidian-800 h-1.5 rounded-full overflow-hidden">
+          <div id="kpiTodayBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Card 2: Active Streak Leader -->
+      <div class="bg-white dark:bg-obsidian-900 border border-slate-200/90 dark:border-white/[0.07] rounded-xl p-5 shadow-sm relative overflow-hidden">
+        <div class="flex items-start justify-between">
+          <div class="min-w-0 pr-2">
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">Longest Active Streak</span>
+            <div class="mt-2 flex items-baseline gap-2">
+              <span id="kpiStreakValue" class="font-display font-bold text-2xl sm:text-3xl tracking-tight text-amber-500 tabular-nums">0 DAYS</span>
+              <span id="kpiBestRecord" class="font-mono text-xs text-slate-400 dark:text-slate-500 tabular-nums">(BEST: 0d)</span>
+            </div>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+            <svg class="w-5 h-5 streak-flame-active" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
+            </svg>
+          </div>
+        </div>
+        <p id="kpiStreakHabitName" class="mt-3 text-xs text-slate-500 dark:text-slate-400 truncate font-medium">No active streaks yet</p>
+      </div>
+
+      <!-- Card 3: 7-Day Window Velocity -->
+      <div class="bg-white dark:bg-obsidian-900 border border-slate-200/90 dark:border-white/[0.07] rounded-xl p-5 shadow-sm relative overflow-hidden">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-[11px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 block">7-Day Window Rate</span>
+            <div class="mt-2 flex items-baseline gap-2.5">
+              <span id="kpiWeeklyRate" class="font-display font-bold text-2xl sm:text-3xl tracking-tight text-slate-900 dark:text-white tabular-nums">0%</span>
+              <span id="kpiWeeklyDelta" class="font-mono text-xs text-indigo-500 dark:text-indigo-400 tabular-nums">0/0 Check-ins</span>
+            </div>
+          </div>
+          <div class="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-500">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4 w-full bg-slate-100 dark:bg-obsidian-800 h-1.5 rounded-full overflow-hidden">
+          <div id="kpiWeeklyBar" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Primary 12-Column Split Workspace -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left 8 Columns: 7-Day Habit Execution Matrix -->
+      <section class="lg:col-span-8 bg-white dark:bg-obsidian-900 border border-slate-200/90 dark:border-white/[0.07] rounded-xl shadow-sm overflow-hidden">
+        
+        <!-- Matrix Toolbar & Category Filter -->
+        <div class="p-4 sm:px-6 border-b border-slate-200/80 dark:border-white/[0.07] flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5">
+            <h2 class="font-display font-semibold text-base text-slate-900 dark:text-white">Habit Execution Matrix</h2>
+            <span id="habitTotalBadge" class="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-obsidian-800 text-slate-600 dark:text-slate-400 tabular-nums">0</span>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="flex items-center gap-1.5 overflow-x-auto py-0.5" id="categoryFilterBar">
+            <button data-cat="ALL" class="cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition bg-slate-900 text-white dark:bg-white dark:text-slate-950">ALL</button>
+            <button data-cat="Cognitive" class="cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]">COGNITIVE</button>
+            <button data-cat="Vitality" class="cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]">VITALITY</button>
+            <button data-cat="Output" class="cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]">OUTPUT</button>
+            <button data-cat="Mindfulness" class="cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]">MINDFULNESS</button>
+          </div>
+        </div>
+
+        <!-- Quick Inline Habit Bar -->
+        <form id="quickAddForm" class="px-4 sm:px-6 py-3 bg-slate-50/70 dark:bg-obsidian-950/40 border-b border-slate-200/70 dark:border-white/[0.05] flex flex-wrap sm:flex-nowrap items-center gap-2">
+          <div class="relative flex-1 min-w-[200px]">
+            <input 
+              id="quickHabitInput" 
+              type="text" 
+              maxlength="48"
+              placeholder="Quick-log new daily protocol (e.g., 45m Deep Code, Zero Sugar)..." 
+              class="w-full pl-3 pr-3 py-1.5 text-xs sm:text-sm bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/[0.08] rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+            />
+          </div>
+          <select id="quickCategorySelect" aria-label="Habit category" class="px-2.5 py-1.5 text-xs font-mono bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/[0.08] rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:border-emerald-500">
+            <option value="Cognitive">Cognitive</option>
+            <option value="Vitality">Vitality</option>
+            <option value="Output">Output</option>
+            <option value="Mindfulness">Mindfulness</option>
+          </select>
+          <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold uppercase tracking-wider bg-slate-900 dark:bg-white/10 hover:bg-slate-800 dark:hover:bg-white/15 text-white transition shrink-0">
+            + Add Row
+          </button>
+        </form>
+
+        <!-- Scrollable 7-Day Matrix Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[680px]">
+            <thead>
+              <tr id="matrixHeaderRow" class="border-b border-slate-200/80 dark:border-white/[0.07] bg-slate-50/40 dark:bg-obsidian-950/25">
+                <!-- Populated dynamically via JS -->
+              </tr>
+            </thead>
+            <tbody id="matrixBody" class="divide-y divide-slate-200/60 dark:divide-white/[0.05]">
+              <!-- Populated dynamically via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty State Container -->
+        <div id="emptyMatrixState" class="hidden py-14 px-6 text-center">
+          <div class="w-12 h-12 rounded-full bg-slate-100 dark:bg-obsidian-800 mx-auto flex items-center justify-center text-slate-400 mb-3">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </div>
+          <h3 class="font-display font-semibold text-sm text-slate-800 dark:text-slate-200">No protocols matching filter</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">Add a new habit above or switch the category filter to inspect your 7-day execution matrix.</p>
+        </div>
+
+        <!-- Matrix Footer Legend & Controls -->
+        <div class="px-4 sm:px-6 py-3 bg-slate-50/60 dark:bg-obsidian-950/40 border-t border-slate-200/80 dark:border-white/[0.07] flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex items-center gap-4">
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded bg-emerald-500 inline-block"></span>
+              <span>Completed</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded border border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-obsidian-800 inline-block"></span>
+              <span>Pending</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="text-amber-500 font-mono font-bold">🔥</span>
+              <span>Current Streak (Best)</span>
+            </span>
+          </div>
+          <button id="restoreDemoBtn" class="font-mono text-[11px] text-slate-500 hover:text-emerald-500 dark:hover:text-emerald-400 underline underline-offset-4 transition">
+            Reset Default Sample Telemetry
+          </button>
+        </div>
+      </section>
+
+      <!-- Right 4 Columns: Interactive Weekly Streak & Velocity Chart -->
+      <aside class="lg:col-span-4 space-y-6">
+        
+        <!-- Weekly Completion Velocity Chart Card -->
+        <div class="bg-white dark:bg-obsidian-900 border border-slate-200/90 dark:border-white/[0.07] rounded-xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-widest text-emerald-500 block">TELEMETRY PLOT</span>
+              <h2 class="font-display font-semibold text-base text-slate-900 dark:text-white">Weekly Completion Curve</h2>
+            </div>
+            <div class="text-right">
+              <span id="chartHoverLabel" class="font-mono text-xs px-2 py-1 rounded bg-slate-100 dark:bg-obsidian-800 text-slate-600 dark:text-slate-300 tabular-nums">
+                7D AVG
+              </span>
+            </div>
+          </div>
+
+          <!-- Interactive SVG Area + Bar Hybrid Chart -->
+          <div class="relative pt-2 pb-1">
+            <div id="svgChartContainer" class="w-full h-56 select-none">
+              <!-- Populated dynamically via JS -->
+            </div>
+          </div>
+
+          <!-- Daily Breakdown Mini Legend -->
+          <div id="chartDayStatsRow" class="grid grid-cols-7 gap-1 pt-3 mt-2 border-t border-slate-100 dark:border-white/[0.06] text-center">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
+
+        <!-- Streak Leaderboard & Consistency Insights -->
+        <div class="bg-white dark:bg-obsidian-900 border border-slate-200/90 dark:border-white/[0.07] rounded-xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-widest text-amber-500 block">MOMENTUM ENGINE</span>
+              <h3 class="font-display font-semibold text-base text-slate-900 dark:text-white">Streak Leaderboard</h3>
+            </div>
+            <span class="text-xs font-mono text-slate-400">CURR / BEST</span>
+          </div>
+
+          <div id="streakLeaderboardList" class="space-y-3 mt-3">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
+
+      </aside>
+    </div>
+  </main>
+
+  <!-- Modal for Detailed New Habit Creation -->
+  <div id="habitModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+    <div class="bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/[0.08]">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <h3 class="font-display font-bold text-base text-slate-900 dark:text-white">Configure New Habit Protocol</h3>
+        </div>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="modalHabitForm" class="mt-4 space-y-4">
+        <div>
+          <label for="modalHabitName" class="block text-xs font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Protocol Title *</label>
+          <input 
+            id="modalHabitName" 
+            type="text" 
+            required 
+            maxlength="48"
+            placeholder="e.g., 60m Deep Architectural Work" 
+            class="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-white/10 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="modalHabitCategory" class="block text-xs font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Domain</label>
+            <select id="modalHabitCategory" class="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-white/10 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500">
+              <option value="Cognitive">Cognitive</option>
+              <option value="Vitality">Vitality</option>
+              <option value="Output">Output</option>
+              <option value="Mindfulness">Mindfulness</option>
+            </select>
+          </div>
+          <div>
+            <label for="modalHabitTarget" class="block text-xs font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Weekly Target</label>
+            <select id="modalHabitTarget" class="w-full px-3 py-2 text-sm font-mono bg-slate-50 dark:bg-obsidian-950 border border-slate-300 dark:border-white/10 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500">
+              <option value="7">7 days / wk (Daily)</option>
+              <option value="6">6 days / wk</option>
+              <option value="5" selected>5 days / wk</option>
+              <option value="4">4 days / wk</option>
+              <option value="3">3 days / wk</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Telemetry Accent Color</label>
+          <div class="flex items-center gap-2.5" id="colorPickerGroup">
+            <button type="button" data-color="#10B981" class="color-swatch w-7 h-7 rounded-full bg-emerald-500 ring-2 ring-offset-2 ring-emerald-500 dark:ring-offset-obsidian-900"></button>
+            <button type="button" data-color="#6366F1" class="color-swatch w-7 h-7 rounded-full bg-indigo-500 opacity-70 hover:opacity-100"></button>
+            <button type="button" data-color="#F59E0B" class="color-swatch w-7 h-7 rounded-full bg-amber-500 opacity-70 hover:opacity-100"></button>
+            <button type="button" data-color="#06B6D4" class="color-swatch w-7 h-7 rounded-full bg-cyan-500 opacity-70 hover:opacity-100"></button>
+            <button type="button" data-color="#EC4899" class="color-swatch w-7 h-7 rounded-full bg-pink-500 opacity-70 hover:opacity-100"></button>
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-white/[0.08]">
+          <button type="button" id="cancelModalBtn" class="px-4 py-2 rounded-lg text-xs font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-xs font-mono uppercase tracking-wider font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-sm">
+            Deploy Protocol
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Data Portability & Import (JSON / CSV) -->
+  <div id="importModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+    <div class="bg-white dark:bg-obsidian-900 border border-slate-200 dark:border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/[0.08]">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+          <h3 class="font-display font-bold text-base text-slate-900 dark:text-white">Data Portability // Import Telemetry</h3>
+        </div>
+        <button id="closeImportModalBtn" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="mt-4 space-y-4">
+        <!-- Import Strategy Toggle: Merge vs Overwrite -->
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Ingestion Strategy</label>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" data-import-mode="merge" class="import-mode-btn p-3 rounded-xl border text-left transition bg-emerald-500/10 border-emerald-500/40 text-slate-900 dark:text-white">
+              <div class="flex items-center justify-between">
+                <span class="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">MERGE LOGS</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Combines imported check-ins with current protocols without deleting existing history.</p>
+            </button>
+            <button type="button" data-import-mode="overwrite" class="import-mode-btn p-3 rounded-xl border text-left transition bg-slate-50 dark:bg-obsidian-950 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 opacity-75 hover:opacity-100">
+              <div class="flex items-center justify-between">
+                <span class="font-mono text-xs font-bold text-amber-500">OVERWRITE ALL</span>
+                <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Replaces all current browser telemetry with the imported snapshot.</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Drag & Drop Zone -->
+        <div id="importDropZone" class="border-2 border-dashed border-slate-300 dark:border-white/15 hover:border-emerald-500 dark:hover:border-emerald-400 rounded-xl p-6 text-center cursor-pointer transition bg-slate-50/60 dark:bg-obsidian-950/50">
+          <input id="importFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden" />
+          <div class="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 mx-auto flex items-center justify-center mb-2.5">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <p class="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200">Drop <span class="font-mono text-emerald-500">.json</span> or <span class="font-mono text-indigo-400">.csv</span> backup file here, or <span class="underline text-emerald-500">browse</span></p>
+          <p id="selectedFileBadge" class="text-[11px] font-mono text-slate-400 dark:text-slate-500 mt-1.5">Supports Kinetic JSON snapshots & flat CSV logs</p>
+        </div>
+
+        <!-- Validation / Status Readout -->
+        <div id="importStatusBox" class="hidden p-3 rounded-lg text-xs font-mono border"></div>
+
+        <!-- Footer Actions -->
+        <div class="pt-3 flex items-center justify-between gap-2 border-t border-slate-200 dark:border-white/[0.08]">
+          <div class="flex items-center gap-2">
+            <button type="button" id="modalQuickExportJson" class="text-[11px] font-mono text-slate-500 hover:text-emerald-500 underline underline-offset-4">
+              Download JSON
+            </button>
+            <span class="text-slate-400">·</span>
+            <button type="button" id="modalQuickExportCsv" class="text-[11px] font-mono text-slate-500 hover:text-indigo-400 underline underline-offset-4">
+              Download CSV
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="cancelImportModalBtn" class="px-3.5 py-2 rounded-lg text-xs font-mono uppercase tracking-wider text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]">
+              Close
+            </button>
+            <button type="button" id="confirmImportBtn" disabled class="px-4 py-2 rounded-lg text-xs font-mono uppercase tracking-wider font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:pointer-events-none text-slate-950 shadow-sm transition">
+              Execute Import
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Toast Notification -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 pointer-events-none opacity-0 translate-y-2 transition-all duration-200 bg-slate-900 dark:bg-obsidian-800 text-white border border-white/10 px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-mono">
+    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="toastMessage">Telemetry updated</span>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    (function () {
+      'use strict';
+
+      const STORAGE_KEY = 'KINETIC_HABIT_TELEMETRY_V2';
+      const THEME_KEY = 'KINETIC_THEME_MODE';
+
+      // Category Badge Styles
+      const CATEGORY_META = {
+        Cognitive: {
+          badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+          dot: '#6366F1'
+        },
+        Vitality: {
+          badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+          dot: '#10B981'
+        },
+        Output: {
+          badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+          dot: '#F59E0B'
+        },
+        Mindfulness: {
+          badge: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20',
+          dot: '#06B6D4'
+        }
+      };
+
+      // State
+      let state = {
+        habits: [],
+        weekOffset: 0, // 0 = current 7-day rolling window ending today, -1 = previous 7 days
+        selectedCategory: 'ALL',
+        modalSelectedColor: '#10B981',
+        lastToggledKey: null, // used to trigger spring pop animation on specific cell
+        importMode: 'merge', // 'merge' | 'overwrite'
+        stagedImportPayload: null // holds parsed habits array ready for confirmation
+      };
+
+      // Date Helpers (Local Time YYYY-MM-DD)
+      function toDateKey(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function addDays(dateObj, days) {
+        const copy = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+        copy.setDate(copy.getDate() + days);
+        return copy;
+      }
+
+      function getToday() {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      }
+
+      // Generate 7-day window array of Date objects based on weekOffset
+      function getActiveSevenDays() {
+        const today = getToday();
+        const endDay = addDays(today, state.weekOffset * 7);
+        const days = [];
+        for (let i = 6; i >= 0; i--) {
+          days.push(addDays(endDay, -i));
+        }
+        return days;
+      }
+
+      // Generate realistic initial sample habits with rich streak history
+      function buildDefaultHabits() {
+        const today = getToday();
+        const dKey = (offset) => toDateKey(addDays(today, offset));
+
+        // Helper to generate completion map from array of day offsets (e.g., [0, -1, -2...])
+        const makeLogs = (offsets) => {
+          const map = {};
+          offsets.forEach(off => { map[dKey(off)] = true; });
+          return map;
+        };
+
+        return [
+          {
+            id: 'hab-1',
+            name: '90m Deep Systems Architecture',
+            category: 'Cognitive',
+            targetPerWeek: 6,
+            color: '#6366F1',
+            logs: makeLogs([0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -13, -14])
+          },
+          {
+            id: 'hab-2',
+            name: 'Zone-2 Cardio + Mobility Protocol',
+            category: 'Vitality',
+            targetPerWeek: 5,
+            color: '#10B981',
+            logs: makeLogs([0, -1, -2, -3, -4, -6, -7, -8, -10, -11, -12])
+          },
+          {
+            id: 'hab-3',
+            name: 'Zero Refined Sugar & Late Caffeine',
+            category: 'Vitality',
+            targetPerWeek: 7,
+            color: '#10B981',
+            logs: makeLogs([-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15])
+          },
+          {
+            id: 'hab-4',
+            name: 'Ship 1 Atomic Production Commit',
+            category: 'Output',
+            targetPerWeek: 5,
+            color: '#F59E0B',
+            logs: makeLogs([0, -1, -2, -4, -5, -6, -8, -9, -11])
+          },
+          {
+            id: 'hab-5',
+            name: '20m Non-Sleep Deep Rest (NSDR)',
+            category: 'Mindfulness',
+            targetPerWeek: 7,
+            color: '#06B6D4',
+            logs: makeLogs([0, -1, -3, -4, -6, -7, -9, -10])
+          },
+          {
+            id: 'hab-6',
+            name: 'Technical Literature Review (15 pgs)',
+            category: 'Cognitive',
+            targetPerWeek: 5,
+            color: '#EC4899',
+            logs: makeLogs([-1, -2, -5, -6, -7, -8, -12, -13])
+          }
+        ];
+      }
+
+      // Load & Save Persistence
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.habits)) {
+              state.habits = parsed.habits;
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to parse local habit storage, falling back to defaults.', err);
+        }
+        state.habits = buildDefaultHabits();
+        saveState();
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ habits: state.habits }));
+        } catch (err) {
+          console.warn('Could not persist habit telemetry:', err);
+        }
+      }
+
+      // Calculate Current Streak and Best Historical Streak for a Habit
+      function computeHabitStreaks(habit) {
+        const logs = habit.logs || {};
+        const today = getToday();
+        const todayKey = toDateKey(today);
+        const yesterdayKey = toDateKey(addDays(today, -1));
+
+        // 1. Calculate Current Streak:
+        // If today is completed, count backwards from today.
+        // If today is not yet completed, count backwards from yesterday so streak isn't zeroed mid-day.
+        let currentStreak = 0;
+        let cursor = logs[todayKey] ? today : (logs[yesterdayKey] ? addDays(today, -1) : null);
+
+        if (cursor) {
+          while (logs[toDateKey(cursor)]) {
+            currentStreak++;
+            cursor = addDays(cursor, -1);
+          }
+        }
+
+        // 2. Calculate Best Streak across all logged dates
+        const completedDates = Object.keys(logs)
+          .filter(k => logs[k])
+          .sort(); // YYYY-MM-DD sorts chronologically
+
+        let bestStreak = 0;
+        let running = 0;
+        let prevDate = null;
+
+        for (const dateStr of completedDates) {
+          const parts = dateStr.split('-').map(Number);
+          const curDate = new Date(parts[0], parts[1] - 1, parts[2]);
+
+          if (!prevDate) {
+            running = 1;
+          } else {
+            const diffDays = Math.round((curDate - prevDate) / (1000 * 60 * 60 * 24));
+            if (diffDays === 1) {
+              running += 1;
+            } else if (diffDays > 1) {
+              running = 1;
+            }
+          }
+          if (running > bestStreak) bestStreak = running;
+          prevDate = curDate;
+        }
+
+        bestStreak = Math.max(bestStreak, currentStreak);
+        return { currentStreak, bestStreak };
+      }
+
+      // Toast helper
+      let toastTimer = null;
+      function showToast(msg) {
+        const banner = document.getElementById('toastBanner');
+        const text = document.getElementById('toastMessage');
+        text.textContent = msg;
+        banner.classList.remove('opacity-0', 'translate-y-2');
+        banner.classList.add('opacity-100', 'translate-y-0');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          banner.classList.add('opacity-0', 'translate-y-2');
+          banner.classList.remove('opacity-100', 'translate-y-0');
+        }, 2200);
+      }
+
+      // Toggle Completion for Habit on a specific YYYY-MM-DD
+      function toggleHabitDay(habitId, dateKey) {
+        const habit = state.habits.find(h => h.id === habitId);
+        if (!habit) return;
+        if (!habit.logs) habit.logs = {};
+
+        if (habit.logs[dateKey]) {
+          delete habit.logs[dateKey];
+        } else {
+          habit.logs[dateKey] = true;
+          state.lastToggledKey = `${habitId}_${dateKey}`;
+        }
+
+        saveState();
+        renderAll();
+      }
+
+      // Delete a Habit
+      function deleteHabit(habitId) {
+        const target = state.habits.find(h => h.id === habitId);
+        if (!target) return;
+        state.habits = state.habits.filter(h => h.id !== habitId);
+        saveState();
+        renderAll();
+        showToast(`Removed "${target.name}"`);
+      }
+
+      // Add a New Habit
+      function createHabit(name, category, targetPerWeek = 5, color = null) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+
+        const defaultColor = color || (CATEGORY_META[category] ? CATEGORY_META[category].dot : '#10B981');
+        const newHabit = {
+          id: 'hab-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+          name: trimmed,
+          category: category || 'Cognitive',
+          targetPerWeek: Number(targetPerWeek) || 5,
+          color: defaultColor,
+          logs: {}
+        };
+
+        state.habits.unshift(newHabit);
+        saveState();
+        renderAll();
+        showToast(`Deployed "${trimmed}"`);
+      }
+
+      // Format Header Range Label
+      function formatShortDate(d) {
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      // Render Top KPI Cards
+      function renderKPIs(sevenDays) {
+        const todayKey = toDateKey(getToday());
+        const totalHabits = state.habits.length;
+
+        // 1. Today's Execution
+        let completedToday = 0;
+        state.habits.forEach(h => {
+          if (h.logs && h.logs[todayKey]) completedToday++;
+        });
+        const todayPct = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
+
+        document.getElementById('kpiTodayCount').textContent = `${completedToday}/${totalHabits}`;
+        document.getElementById('kpiTodayPct').textContent = `${todayPct}%`;
+        document.getElementById('kpiTodayBar').style.width = `${todayPct}%`;
+
+        // 2. Longest Active Streak
+        let topHabit = null;
+        let maxCurrent = 0;
+        let maxBestOverall = 0;
+
+        state.habits.forEach(h => {
+          const { currentStreak, bestStreak } = computeHabitStreaks(h);
+          if (bestStreak > maxBestOverall) maxBestOverall = bestStreak;
+          if (currentStreak > maxCurrent) {
+            maxCurrent = currentStreak;
+            topHabit = h;
+          }
+        });
+
+        document.getElementById('kpiStreakValue').textContent = `${maxCurrent} ${maxCurrent === 1 ? 'DAY' : 'DAYS'}`;
+        document.getElementById('kpiBestRecord').textContent = `(BEST: ${maxBestOverall}d)`;
+        document.getElementById('kpiStreakHabitName').textContent = topHabit
+          ? `Lead Protocol: ${topHabit.name}`
+          : (totalHabits > 0 ? 'Log today to ignite an active streak' : 'Add a habit to start tracking');
+
+        // 3. 7-Day Window Completion Rate
+        const totalPossible = totalHabits * 7;
+        let windowCompleted = 0;
+        const dayKeys = sevenDays.map(toDateKey);
+
+        state.habits.forEach(h => {
+          dayKeys.forEach(k => {
+            if (h.logs && h.logs[k]) windowCompleted++;
+          });
+        });
+
+        const windowPct = totalPossible > 0 ? Math.round((windowCompleted / totalPossible) * 100) : 0;
+        document.getElementById('kpiWeeklyRate').textContent = `${windowPct}%`;
+        document.getElementById('kpiWeeklyDelta').textContent = `${windowCompleted}/${totalPossible} Check-ins`;
+        document.getElementById('kpiWeeklyBar').style.width = `${windowPct}%`;
+      }
+
+      // Render 7-Day Matrix Header & Rows
+      function renderMatrix(sevenDays) {
+        const todayKey = toDateKey(getToday());
+        const headerRow = document.getElementById('matrixHeaderRow');
+        const body = document.getElementById('matrixBody');
+        const emptyState = document.getElementById('emptyMatrixState');
+
+        // Update week navigation label & buttons
+        const startLabel = formatShortDate(sevenDays[0]);
+        const endLabel = formatShortDate(sevenDays[6]);
+        document.getElementById('weekRangeLabel').textContent = `${startLabel} — ${endLabel}`;
+        document.getElementById('nextWeekBtn').disabled = state.weekOffset >= 0;
+
+        const resetBtn = document.getElementById('resetTodayBtn');
+        if (state.weekOffset !== 0) {
+          resetBtn.classList.remove('hidden');
+        } else {
+          resetBtn.classList.add('hidden');
+        }
+
+        // Filter habits
+        const filteredHabits = state.selectedCategory === 'ALL'
+          ? state.habits
+          : state.habits.filter(h => h.category === state.selectedCategory);
+
+        document.getElementById('habitTotalBadge').textContent = `${filteredHabits.length} ACTIVE`;
+
+        // Build Header Columns
+        let headerHTML = `
+          <th class="py-3 pl-4 sm:pl-6 pr-3 text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 w-[260px] sm:w-[300px]">
+            Protocol / Domain
+          </th>
+        `;
+
+        sevenDays.forEach(d => {
+          const key = toDateKey(d);
+          const isToday = key === todayKey;
+          const dow = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+          const dayNum = String(d.getDate()).padStart(2, '0');
+
+          headerHTML += `
+            <th class="py-2.5 px-1.5 text-center w-12 ${isToday ? 'bg-emerald-500/[0.06] dark:bg-emerald-500/[0.08]' : ''}">
+              <div class="flex flex-col items-center">
+                <span class="text-[10px] font-mono tracking-wider ${isToday ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400 dark:text-slate-500'}">${dow}</span>
+                <span class="mt-0.5 text-xs font-mono tabular-nums ${isToday ? 'px-1.5 py-0.2 rounded bg-emerald-500 text-slate-950 font-bold' : 'text-slate-700 dark:text-slate-300'}">${dayNum}</span>
+              </div>
+            </th>
+          `;
+        });
+
+        headerHTML += `
+          <th class="py-3 px-3 text-right text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 w-28">
+            Streak
+          </th>
+          <th class="py-3 pl-2 pr-4 sm:pr-6 text-right text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 w-20">
+            7D Rate
+          </th>
+        `;
+        headerRow.innerHTML = headerHTML;
+
+        // Handle Empty State
+        if (filteredHabits.length === 0) {
+          body.innerHTML = '';
+          emptyState.classList.remove('hidden');
+          return;
+        }
+        emptyState.classList.add('hidden');
+
+        // Build Body Rows
+        let rowsHTML = '';
+        filteredHabits.forEach(habit => {
+          const catMeta = CATEGORY_META[habit.category] || CATEGORY_META.Cognitive;
+          const { currentStreak, bestStreak } = computeHabitStreaks(habit);
+
+          // Count 7-day completions in active window
+          let windowCount = 0;
+          sevenDays.forEach(d => {
+            if (habit.logs && habit.logs[toDateKey(d)]) windowCount++;
+          });
+          const windowPct = Math.round((windowCount / 7) * 100);
+
+          rowsHTML += `
+            <tr class="group hover:bg-slate-50/90 dark:hover:bg-white/[0.02] transition-colors">
+              <!-- Habit Title & Metadata -->
+              <td class="py-3 pl-4 sm:pl-6 pr-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${habit.color || catMeta.dot}"></span>
+                      <span class="font-medium text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate block">${escapeHTML(habit.name)}</span>
+                    </div>
+                    <div class="mt-1 flex items-center gap-2 pl-4">
+                      <span class="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded border ${catMeta.badge}">${habit.category}</span>
+                      <span class="text-[11px] font-mono text-slate-400 dark:text-slate-500 tabular-nums">Target: ${habit.targetPerWeek || 5}d/wk</span>
+                    </div>
+                  </div>
+                  <button 
+                    type="button"
+                    data-delete-id="${habit.id}"
+                    title="Delete protocol"
+                    class="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1.5 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition shrink-0"
+                  >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+          `;
+
+          // 7 Interactive Day Cells
+          sevenDays.forEach(d => {
+            const dKey = toDateKey(d);
+            const isToday = dKey === todayKey;
+            const isDone = Boolean(habit.logs && habit.logs[dKey]);
+            const cellAnimKey = `${habit.id}_${dKey}`;
+            const popClass = state.lastToggledKey === cellAnimKey ? 'animate-check-pop' : '';
+
+            rowsHTML += `
+              <td class="p-1.5 text-center ${isToday ? 'bg-emerald-500/[0.06] dark:bg-emerald-500/[0.08]' : ''}">
+                <button
+                  type="button"
+                  data-toggle-habit="${habit.id}"
+                  data-toggle-date="${dKey}"
+                  aria-label="Toggle ${escapeHTML(habit.name)} on ${dKey}"
+                  aria-pressed="${isDone}"
+                  class="w-9 h-9 mx-auto rounded-lg flex items-center justify-center transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${popClass} ${
+                    isDone
+                      ? 'bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/25 hover:bg-emerald-400'
+                      : 'bg-slate-100/90 dark:bg-obsidian-800/90 border border-slate-200/90 dark:border-white/[0.07] text-transparent hover:border-emerald-500/50 dark:hover:border-emerald-400/50'
+                  }"
+                >
+                  <svg class="w-4 h-4 stroke-[2.8] ${isDone ? 'opacity-100' : 'opacity-0'}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </td>
+            `;
+          });
+
+          // Streak Readout Cell
+          const hasActiveStreak = currentStreak > 0;
+          rowsHTML += `
+              <td class="py-3 px-3 text-right font-mono whitespace-nowrap">
+                <div class="inline-flex items-center justify-end gap-1">
+                  <span class="${hasActiveStreak ? 'text-amber-500 font-bold' : 'text-slate-400 dark:text-slate-600'} text-xs tabular-nums">
+                    ${hasActiveStreak ? '🔥' : '·'} ${currentStreak}d
+                  </span>
+                  <span class="text-[11px] text-slate-400 dark:text-slate-500 tabular-nums">/ ${bestStreak}d</span>
+                </div>
+              </td>
+              <!-- 7D Mini Progress Cell -->
+              <td class="py-3 pl-2 pr-4 sm:pr-6 text-right font-mono">
+                <div class="flex flex-col items-end gap-1">
+                  <span class="text-xs font-medium ${windowPct >= 70 ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400'} tabular-nums">${windowCount}/7</span>
+                  <div class="w-12 h-1 bg-slate-200 dark:bg-obsidian-800 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full ${windowPct >= 70 ? 'bg-emerald-500' : 'bg-indigo-500'}" style="width: ${windowPct}%"></div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+
+        body.innerHTML = rowsHTML;
+        state.lastToggledKey = null;
+      }
+
+      // Render Weekly Completion Velocity SVG Chart & Day Breakdown
+      function renderWeeklyChart(sevenDays) {
+        const container = document.getElementById('svgChartContainer');
+        const statsRow = document.getElementById('chartDayStatsRow');
+        const hoverLabel = document.getElementById('chartHoverLabel');
+        const totalHabits = state.habits.length;
+        const todayKey = toDateKey(getToday());
+
+        // Compute daily stats for the 7-day window
+        const dayStats = sevenDays.map(d => {
+          const key = toDateKey(d);
+          const dow = d.toLocaleDateString('en-US', { weekday: 'short' });
+          let done = 0;
+          state.habits.forEach(h => {
+            if (h.logs && h.logs[key]) done++;
+          });
+          const pct = totalHabits > 0 ? Math.round((done / totalHabits) * 100) : 0;
+          return {
+            date: d,
+            key,
+            dow,
+            done,
+            total: totalHabits,
+            pct,
+            isToday: key === todayKey
+          };
+        });
+
+        const avgPct = dayStats.length > 0
+          ? Math.round(dayStats.reduce((acc, item) => acc + item.pct, 0) / dayStats.length)
+          : 0;
+        hoverLabel.textContent = `7D AVG: ${avgPct}%`;
+
+        // SVG Geometry
+        const width = 380;
+        const height = 210;
+        const padLeft = 32;
+        const padRight = 16;
+        const padTop = 18;
+        const padBottom = 28;
+        const plotW = width - padLeft - padRight;
+        const plotH = height - padTop - padBottom;
+
+        const stepX = plotW / (dayStats.length - 1);
+
+        // Calculate coordinates
+        const points = dayStats.map((st, idx) => {
+          const x = padLeft + idx * stepX;
+          const y = padTop + plotH - (st.pct / 100) * plotH;
+          return { x, y, ...st };
+        });
+
+        // Build smooth cubic bezier or polyline path
+        const lineCoords = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+        const areaPath = `M ${points[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L ` +
+          points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ') +
+          ` L ${points[points.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
+
+        // Horizontal reference lines (0%, 50%, 100%)
+        const gridLevels = [0, 50, 100];
+        let gridLinesSVG = '';
+        gridLevels.forEach(lvl => {
+          const y = padTop + plotH - (lvl / 100) * plotH;
+          gridLinesSVG += `
+            <line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="currentColor" class="text-slate-200 dark:text-white/[0.07]" stroke-dasharray="3 3" stroke-width="1" />
+            <text x="${padLeft - 6}" y="${y + 3}" text-anchor="end" class="fill-slate-400 dark:fill-slate-500 font-mono text-[9px]">${lvl}%</text>
+          `;
+        });
+
+        // Vertical Columns & Interactive Nodes
+        let columnsSVG = '';
+        points.forEach((p, idx) => {
+          const barW = 22;
+          const barH = Math.max(4, (p.pct / 100) * plotH);
+          const barX = p.x - barW / 2;
+          const barY = padTop + plotH - barH;
+
+          columnsSVG += `
+            <g class="chart-day-group cursor-pointer group" data-idx="${idx}">
+              <!-- Subtle background track bar -->
+              <rect x="${barX}" y="${padTop}" width="${barW}" height="${plotH}" rx="4" class="fill-slate-100/70 dark:fill-white/[0.02] group-hover:fill-emerald-500/10 transition-colors" />
+              <!-- Filled velocity bar -->
+              <rect x="${barX}" y="${barY}" width="${barW}" height="${barH}" rx="4" class="${p.isToday ? 'fill-emerald-500/35' : 'fill-indigo-500/20 dark:fill-indigo-500/25'} group-hover:fill-emerald-500/50 transition-all" />
+              <!-- Data node circle -->
+              <circle cx="${p.x}" cy="${p.y}" r="${p.isToday ? 5 : 4}" class="${p.isToday ? 'fill-emerald-400 stroke-slate-950' : 'fill-emerald-500 stroke-white dark:stroke-obsidian-900'} stroke-2 group-hover:scale-125 transition-transform" style="transform-origin: ${p.x}px ${p.y}px" />
+              <!-- X-Axis Day Label -->
+              <text x="${p.x}" y="${height - 8}" text-anchor="middle" class="font-mono text-[10px] ${p.isToday ? 'fill-emerald-500 font-bold' : 'fill-slate-400 dark:fill-slate-500'}">${p.dow.toUpperCase()}</text>
+            </g>
+          `;
+        });
+
+        container.innerHTML = `
+          <svg viewBox="0 0 ${width} ${height}" class="w-full h-full overflow-visible">
+            <defs>
+              <linearGradient id="velocityAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#10B981" stop-opacity="0.32" />
+                <stop offset="100%" stop-color="#10B981" stop-opacity="0.0" />
+              </linearGradient>
+            </defs>
+            ${gridLinesSVG}
+            <path d="${areaPath}" fill="url(#velocityAreaGrad)" />
+            <polyline fill="none" stroke="#10B981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="${lineCoords}" />
+            ${columnsSVG}
+          </svg>
+        `;
+
+        // Attach hover listeners to SVG nodes to update readout badge
+        container.querySelectorAll('.chart-day-group').forEach(node => {
+          node.addEventListener('mouseenter', () => {
+            const idx = Number(node.getAttribute('data-idx'));
+            const st = dayStats[idx];
+            if (st) {
+              hoverLabel.textContent = `${st.dow.toUpperCase()} (${formatShortDate(st.date)}): ${st.done}/${st.total} (${st.pct}%)`;
+            }
+          });
+          node.addEventListener('mouseleave', () => {
+            hoverLabel.textContent = `7D AVG: ${avgPct}%`;
+          });
+        });
+
+        // Populate bottom 7-column numerical readout
+        statsRow.innerHTML = dayStats.map(st => `
+          <div class="px-1 py-1.5 rounded-lg ${st.isToday ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-slate-50 dark:bg-obsidian-950/60'}">
+            <span class="block text-[10px] font-mono ${st.isToday ? 'text-emerald-500 font-bold' : 'text-slate-400'}">${st.dow.slice(0, 2).toUpperCase()}</span>
+            <span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 tabular-nums">${st.pct}%</span>
+            <span class="block text-[10px] font-mono text-slate-400 tabular-nums">${st.done}/${st.total}</span>
+          </div>
+        `).join('');
+      }
+
+      // Render Streak Leaderboard Card
+      function renderLeaderboard() {
+        const listEl = document.getElementById('streakLeaderboardList');
+        if (state.habits.length === 0) {
+          listEl.innerHTML = `<p class="text-xs text-slate-400 font-mono py-4 text-center">No active protocols registered.</p>`;
+          return;
+        }
+
+        const ranked = state.habits.map(h => {
+          const { currentStreak, bestStreak } = computeHabitStreaks(h);
+          return { ...h, currentStreak, bestStreak };
+        }).sort((a, b) => (b.currentStreak - a.currentStreak) || (b.bestStreak - a.bestStreak));
+
+        listEl.innerHTML = ranked.slice(0, 5).map(item => {
+          const ratio = item.bestStreak > 0 ? Math.min(100, Math.round((item.currentStreak / item.bestStreak) * 100)) : 0;
+          return `
+            <div class="p-3 rounded-lg bg-slate-50/80 dark:bg-obsidian-950/60 border border-slate-200/60 dark:border-white/[0.05]">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2 h-2 rounded-full shrink-0" style="background-color: ${item.color}"></span>
+                  <span class="font-medium text-slate-800 dark:text-slate-200 truncate">${escapeHTML(item.name)}</span>
+                </div>
+                <div class="font-mono shrink-0 flex items-center gap-1 tabular-nums">
+                  <span class="${item.currentStreak > 0 ? 'text-amber-500 font-bold' : 'text-slate-400'}">${item.currentStreak}d</span>
+                  <span class="text-slate-400 dark:text-slate-600">/</span>
+                  <span class="text-slate-500 dark:text-slate-400">${item.bestStreak}d</span>
+                </div>
+              </div>
+              <div class="mt-2 w-full bg-slate-200/80 dark:bg-obsidian-800 h-1 rounded-full overflow-hidden">
+                <div class="h-full rounded-full bg-amber-500 transition-all duration-500" style="width: ${ratio}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // HTML Escaping Utility
+      function escapeHTML(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      // ==========================================
+      // DATA PORTABILITY & BACKUP ENGINE (JSON/CSV)
+      // ==========================================
+
+      function triggerFileDownload(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      // 1. Export Full JSON Snapshot
+      function exportTelemetryJSON() {
+        const dateStamp = toDateKey(getToday());
+        const totalCheckins = state.habits.reduce((acc, h) => acc + Object.keys(h.logs || {}).filter(k => h.logs[k]).length, 0);
+        const payload = {
+          schema: 'KINETIC_TELEMETRY_BACKUP_V2',
+          exportedAt: new Date().toISOString(),
+          metadata: {
+            habitCount: state.habits.length,
+            totalCompletedLogs: totalCheckins
+          },
+          habits: state.habits
+        };
+        const filename = `habit_telemetry_backup_${dateStamp}.json`;
+        triggerFileDownload(JSON.stringify(payload, null, 2), filename, 'application/json;charset=utf-8;');
+        showToast(`Exported ${state.habits.length} protocols (${totalCheckins} logs) to JSON`);
+      }
+
+      // 2. Export Analytics-Ready Flat CSV (Long Format suitable for SQL/Python/Pandas)
+      function exportTelemetryCSV() {
+        const dateStamp = toDateKey(getToday());
+        const escapeCSV = (val) => {
+          const str = String(val ?? '');
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        };
+
+        const rows = [
+          ['habit_id', 'habit_name', 'domain', 'target_per_week', 'color', 'date', 'completed'].join(',')
+        ];
+
+        let exportedRowCount = 0;
+        state.habits.forEach(h => {
+          const logKeys = Object.keys(h.logs || {}).filter(k => h.logs[k]).sort();
+          if (logKeys.length === 0) {
+            // Still preserve habit definition row with empty date so habit metadata survives CSV round-trip
+            rows.push([
+              escapeCSV(h.id),
+              escapeCSV(h.name),
+              escapeCSV(h.category || 'Cognitive'),
+              escapeCSV(h.targetPerWeek || 5),
+              escapeCSV(h.color || '#10B981'),
+              '',
+              'false'
+            ].join(','));
+          } else {
+            logKeys.forEach(dateStr => {
+              rows.push([
+                escapeCSV(h.id),
+                escapeCSV(h.name),
+                escapeCSV(h.category || 'Cognitive'),
+                escapeCSV(h.targetPerWeek || 5),
+                escapeCSV(h.color || '#10B981'),
+                escapeCSV(dateStr),
+                'true'
+              ].join(','));
+              exportedRowCount++;
+            });
+          }
+        });
+
+        const filename = `habit_telemetry_logs_${dateStamp}.csv`;
+        triggerFileDownload(rows.join('\n'), filename, 'text/csv;charset=utf-8;');
+        showToast(`Exported ${exportedRowCount} completion records to CSV`);
+      }
+
+      // RFC-4180 compliant single-line CSV row splitter
+      function parseCSVRow(line) {
+        const result = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQuotes) {
+            if (ch === '"' && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else if (ch === '"') {
+              inQuotes = false;
+            } else {
+              cur += ch;
+            }
+          } else {
+            if (ch === '"') {
+              inQuotes = true;
+            } else if (ch === ',') {
+              result.push(cur.trim());
+              cur = '';
+            } else {
+              cur += ch;
+            }
+          }
+        }
+        result.push(cur.trim());
+        return result;
+      }
+
+      // Normalize & Validate Habit Object
+      function sanitizeHabitObject(raw, indexFallback) {
+        if (!raw || typeof raw !== 'object') return null;
+        const name = String(raw.name || raw.habit_name || '').trim();
+        if (!name) return null;
+
+        const validCategories = ['Cognitive', 'Vitality', 'Output', 'Mindfulness'];
+        const rawCat = String(raw.category || raw.domain || 'Cognitive').trim();
+        const category = validCategories.includes(rawCat) ? rawCat : 'Cognitive';
+
+        const targetNum = Number(raw.targetPerWeek ?? raw.target_per_week ?? 5);
+        const targetPerWeek = (!isNaN(targetNum) && targetNum >= 1 && targetNum <= 7) ? Math.round(targetNum) : 5;
+
+        const color = /^#[0-9A-Fa-f]{6}$/.test(String(raw.color || ''))
+          ? raw.color
+          : (CATEGORY_META[category] ? CATEGORY_META[category].dot : '#10B981');
+
+        const cleanLogs = {};
+        if (raw.logs && typeof raw.logs === 'object') {
+          Object.keys(raw.logs).forEach(k => {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(k) && raw.logs[k]) {
+              cleanLogs[k] = true;
+            }
+          });
+        }
+
+        return {
+          id: String(raw.id || raw.habit_id || `hab-imp-${Date.now()}-${indexFallback}`),
+          name: name.slice(0, 48),
+          category,
+          targetPerWeek,
+          color,
+          logs: cleanLogs
+        };
+      }
+
+      // Parse Imported File Text (JSON or CSV)
+      function parseImportContent(text, filename) {
+        const trimmed = text.trim();
+        if (!trimmed) throw new Error('File is empty.');
+
+        const isJSON = filename.toLowerCase().endsWith('.json') || trimmed.startsWith('{') || trimmed.startsWith('[');
+
+        if (isJSON) {
+          let parsed;
+          try {
+            parsed = JSON.parse(trimmed);
+          } catch (e) {
+            throw new Error('Invalid JSON syntax.');
+          }
+          const rawList = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.habits) ? parsed.habits : null);
+          if (!rawList) {
+            throw new Error('JSON schema missing "habits" array.');
+          }
+          const habits = rawList.map((item, idx) => sanitizeHabitObject(item, idx)).filter(Boolean);
+          if (habits.length === 0) {
+            throw new Error('No valid habit protocols found in JSON.');
+          }
+          return habits;
+        } else {
+          // Parse CSV format
+          const lines = trimmed.split(/\r?\n/).filter(l => l.trim().length > 0);
+          if (lines.length < 2) {
+            throw new Error('CSV must contain a header row and at least one data row.');
+          }
+          const headers = parseCSVRow(lines[0]).map(h => h.toLowerCase().trim());
+          const idxId = headers.indexOf('habit_id');
+          const idxName = headers.indexOf('habit_name') !== -1 ? headers.indexOf('habit_name') : headers.indexOf('name');
+          const idxDomain = headers.indexOf('domain') !== -1 ? headers.indexOf('domain') : headers.indexOf('category');
+          const idxTarget = headers.indexOf('target_per_week');
+          const idxColor = headers.indexOf('color');
+          const idxDate = headers.indexOf('date');
+          const idxCompleted = headers.indexOf('completed');
+
+          if (idxName === -1) {
+            throw new Error('CSV header missing required "habit_name" column.');
+          }
+
+          const groupedMap = new Map();
+
+          for (let i = 1; i < lines.length; i++) {
+            const cols = parseCSVRow(lines[i]);
+            const name = cols[idxName] ? cols[idxName].trim() : '';
+            if (!name) continue;
+
+            const id = (idxId !== -1 && cols[idxId]) ? cols[idxId].trim() : `csv-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+            const key = id || name.toLowerCase();
+
+            if (!groupedMap.has(key)) {
+              groupedMap.set(key, {
+                id,
+                name,
+                category: idxDomain !== -1 ? cols[idxDomain] : 'Cognitive',
+                targetPerWeek: idxTarget !== -1 ? cols[idxTarget] : 5,
+                color: idxColor !== -1 ? cols[idxColor] : '',
+                logs: {}
+              });
+            }
+
+            const entry = groupedMap.get(key);
+            const dateStr = idxDate !== -1 ? (cols[idxDate] || '').trim() : '';
+            const completedVal = idxCompleted !== -1 ? (cols[idxCompleted] || 'true').toLowerCase().trim() : 'true';
+            const isCompleted = completedVal === 'true' || completedVal === '1' || completedVal === 'yes';
+
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr) && isCompleted) {
+              entry.logs[dateStr] = true;
+            }
+          }
+
+          const habits = Array.from(groupedMap.values())
+            .map((item, idx) => sanitizeHabitObject(item, idx))
+            .filter(Boolean);
+
+          if (habits.length === 0) {
+            throw new Error('No valid habit records could be reconstructed from CSV.');
+          }
+          return habits;
+        }
+      }
+
+      // Apply Staged Import to State (Merge or Overwrite)
+      function applyStagedImport() {
+        const importedHabits = state.stagedImportPayload;
+        if (!Array.isArray(importedHabits) || importedHabits.length === 0) return;
+
+        let totalLogsRestored = 0;
+        importedHabits.forEach(h => {
+          totalLogsRestored += Object.keys(h.logs || {}).length;
+        });
+
+        if (state.importMode === 'overwrite') {
+          state.habits = importedHabits;
+        } else {
+          // Merge by matching ID or case-insensitive Name
+          const existingList = [...state.habits];
+          importedHabits.forEach(inc => {
+            const match = existingList.find(
+              ex => ex.id === inc.id || ex.name.toLowerCase() === inc.name.toLowerCase()
+            );
+            if (match) {
+              match.logs = { ...(match.logs || {}), ...(inc.logs || {}) };
+              match.category = inc.category || match.category;
+              match.targetPerWeek = inc.targetPerWeek || match.targetPerWeek;
+              match.color = inc.color || match.color;
+            } else {
+              existingList.push(inc);
+            }
+          });
+          state.habits = existingList;
+        }
+
+        saveState();
+        renderAll();
+        showToast(
+          `${state.importMode === 'overwrite' ? 'Replaced' : 'Merged'} ${importedHabits.length} habits (${totalLogsRestored} check-ins)`
+        );
+      }
+
+      // Master Render Coordinator
+      function renderAll() {
+        const sevenDays = getActiveSevenDays();
+        renderKPIs(sevenDays);
+        renderMatrix(sevenDays);
+        renderWeeklyChart(sevenDays);
+        renderLeaderboard();
+      }
+
+      // Theme Initialization & Toggle
+      function initTheme() {
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        if (savedTheme === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+
+        document.getElementById('themeToggleBtn').addEventListener('click', () => {
+          const isDark = document.documentElement.classList.toggle('dark');
+          localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+        });
+      }
+
+      // Event Bindings
+      function bindEvents() {
+        // Matrix Delegation for Check-in Toggles & Delete Buttons
+        document.getElementById('matrixBody').addEventListener('click', (e) => {
+          const toggleBtn = e.target.closest('[data-toggle-habit]');
+          if (toggleBtn) {
+            const habitId = toggleBtn.getAttribute('data-toggle-habit');
+            const dateKey = toggleBtn.getAttribute('data-toggle-date');
+            toggleHabitDay(habitId, dateKey);
+            return;
+          }
+
+          const deleteBtn = e.target.closest('[data-delete-id]');
+          if (deleteBtn) {
+            const habitId = deleteBtn.getAttribute('data-delete-id');
+            deleteHabit(habitId);
+          }
+        });
+
+        // Quick Inline Add Form
+        document.getElementById('quickAddForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const input = document.getElementById('quickHabitInput');
+          const catSelect = document.getElementById('quickCategorySelect');
+          if (!input.value.trim()) return;
+          createHabit(input.value, catSelect.value, 5);
+          input.value = '';
+        });
+
+        // Week Window Navigation
+        document.getElementById('prevWeekBtn').addEventListener('click', () => {
+          state.weekOffset -= 1;
+          renderAll();
+        });
+
+        document.getElementById('nextWeekBtn').addEventListener('click', () => {
+          if (state.weekOffset < 0) {
+            state.weekOffset += 1;
+            renderAll();
+          }
+        });
+
+        document.getElementById('resetTodayBtn').addEventListener('click', () => {
+          state.weekOffset = 0;
+          renderAll();
+        });
+
+        // Category Filter Pills
+        document.getElementById('categoryFilterBar').addEventListener('click', (e) => {
+          const btn = e.target.closest('.cat-pill');
+          if (!btn) return;
+          state.selectedCategory = btn.getAttribute('data-cat');
+
+          document.querySelectorAll('.cat-pill').forEach(pill => {
+            const active = pill.getAttribute('data-cat') === state.selectedCategory;
+            pill.className = active
+              ? 'cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition bg-slate-900 text-white dark:bg-white dark:text-slate-950'
+              : 'cat-pill px-2.5 py-1 rounded-md text-xs font-mono font-medium transition text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.05]';
+          });
+
+          renderAll();
+        });
+
+        // Restore Default Sample Telemetry
+        document.getElementById('restoreDemoBtn').addEventListener('click', () => {
+          state.habits = buildDefaultHabits();
+          state.weekOffset = 0;
+          state.selectedCategory = 'ALL';
+          saveState();
+          renderAll();
+          showToast('Sample telemetry restored');
+        });
+
+        // Modal Open / Close / Submit
+        const modal = document.getElementById('habitModal');
+        const openModal = () => {
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          document.getElementById('modalHabitName').focus();
+        };
+        const closeModal = () => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        };
+
+        document.getElementById('openAddModalBtn').addEventListener('click', openModal);
+        document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+        document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal();
+        });
+
+        // Color Swatch Picker inside Modal
+        document.getElementById('colorPickerGroup').addEventListener('click', (e) => {
+          const swatch = e.target.closest('.color-swatch');
+          if (!swatch) return;
+          state.modalSelectedColor = swatch.getAttribute('data-color');
+          document.querySelectorAll('.color-swatch').forEach(s => {
+            s.classList.remove('ring-2', 'ring-offset-2', 'ring-emerald-500', 'opacity-100');
+            s.classList.add('opacity-70');
+          });
+          swatch.classList.remove('opacity-70');
+          swatch.classList.add('ring-2', 'ring-offset-2', 'ring-emerald-500', 'opacity-100');
+        });
+
+        document.getElementById('modalHabitForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const nameEl = document.getElementById('modalHabitName');
+          const catEl = document.getElementById('modalHabitCategory');
+          const targetEl = document.getElementById('modalHabitTarget');
+
+          createHabit(nameEl.value, catEl.value, Number(targetEl.value), state.modalSelectedColor);
+          nameEl.value = '';
+          closeModal();
+        });
+
+        // ==========================================
+        // EXPORT & IMPORT MODAL EVENT BINDINGS
+        // ==========================================
+        document.getElementById('exportJsonBtn').addEventListener('click', exportTelemetryJSON);
+        document.getElementById('exportCsvBtn').addEventListener('click', exportTelemetryCSV);
+        document.getElementById('modalQuickExportJson').addEventListener('click', exportTelemetryJSON);
+        document.getElementById('modalQuickExportCsv').addEventListener('click', exportTelemetryCSV);
+
+        const importModal = document.getElementById('importModal');
+        const importDropZone = document.getElementById('importDropZone');
+        const importFileInput = document.getElementById('importFileInput');
+        const importStatusBox = document.getElementById('importStatusBox');
+        const confirmImportBtn = document.getElementById('confirmImportBtn');
+        const selectedFileBadge = document.getElementById('selectedFileBadge');
+
+        const resetImportModalState = () => {
+          state.stagedImportPayload = null;
+          importFileInput.value = '';
+          confirmImportBtn.disabled = true;
+          importStatusBox.classList.add('hidden');
+          importStatusBox.textContent = '';
+          selectedFileBadge.textContent = 'Supports Kinetic JSON snapshots & flat CSV logs';
+        };
+
+        const openImportModal = () => {
+          resetImportModalState();
+          importModal.classList.remove('hidden');
+          importModal.classList.add('flex');
+        };
+
+        const closeImportModal = () => {
+          importModal.classList.add('hidden');
+          importModal.classList.remove('flex');
+        };
+
+        document.getElementById('openImportModalBtn').addEventListener('click', openImportModal);
+        document.getElementById('closeImportModalBtn').addEventListener('click', closeImportModal);
+        document.getElementById('cancelImportModalBtn').addEventListener('click', closeImportModal);
+
+        importModal.addEventListener('click', (e) => {
+          if (e.target === importModal) closeImportModal();
+        });
+
+        // Toggle Merge vs Overwrite Strategy
+        document.querySelectorAll('.import-mode-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.importMode = btn.getAttribute('data-import-mode');
+            document.querySelectorAll('.import-mode-btn').forEach(b => {
+              const active = b.getAttribute('data-import-mode') === state.importMode;
+              b.className = active
+                ? 'import-mode-btn p-3 rounded-xl border text-left transition bg-emerald-500/10 border-emerald-500/40 text-slate-900 dark:text-white'
+                : 'import-mode-btn p-3 rounded-xl border text-left transition bg-slate-50 dark:bg-obsidian-950 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 opacity-75 hover:opacity-100';
+            });
+          });
+        });
+
+        // Handle File Selection & Parsing
+        const handleFileForImport = (file) => {
+          if (!file) return;
+          selectedFileBadge.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const parsedHabits = parseImportContent(String(ev.target.result || ''), file.name);
+              state.stagedImportPayload = parsedHabits;
+              const logCount = parsedHabits.reduce((sum, h) => sum + Object.keys(h.logs || {}).length, 0);
+
+              importStatusBox.className = 'p-3 rounded-lg text-xs font-mono border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 block';
+              importStatusBox.textContent = `✓ VALIDATED: ${parsedHabits.length} habit protocols & ${logCount} completion logs ready to ${state.importMode.toUpperCase()}.`;
+              confirmImportBtn.disabled = false;
+            } catch (err) {
+              state.stagedImportPayload = null;
+              confirmImportBtn.disabled = true;
+              importStatusBox.className = 'p-3 rounded-lg text-xs font-mono border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 block';
+              importStatusBox.textContent = `✕ SCHEMA ERROR: ${err.message}`;
+            }
+          };
+          reader.readAsText(file);
+        };
+
+        importDropZone.addEventListener('click', () => importFileInput.click());
+        importFileInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleFileForImport(e.target.files[0]);
+          }
+        });
+
+        importDropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          importDropZone.classList.add('border-emerald-500', 'bg-emerald-500/5');
+        });
+
+        importDropZone.addEventListener('dragleave', () => {
+          importDropZone.classList.remove('border-emerald-500', 'bg-emerald-500/5');
+        });
+
+        importDropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          importDropZone.classList.remove('border-emerald-500', 'bg-emerald-500/5');
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFileForImport(e.dataTransfer.files[0]);
+          }
+        });
+
+        confirmImportBtn.addEventListener('click', () => {
+          applyStagedImport();
+          closeImportModal();
+        });
+
+        // Keyboard Shortcut: 'N' to open New Habit Modal when not typing in an input
+        window.addEventListener('keydown', (e) => {
+          const tag = document.activeElement ? document.activeElement.tagName : '';
+          if (e.key === 'Escape') {
+            if (!modal.classList.contains('hidden')) closeModal();
+            if (!importModal.classList.contains('hidden')) closeImportModal();
+            return;
+          }
+          if ((e.key === 'n' || e.key === 'N') && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+            e.preventDefault();
+            openModal();
+          }
+        });
+      }
+
+      // Initialize Dashboard
+      initTheme();
+      loadState();
+      bindEvents();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
